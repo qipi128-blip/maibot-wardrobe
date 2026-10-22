@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
   "id": "github.qipi128-blip.wardrobe",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "name": "她的衣橱",
-  "description": "让麦麦知道自己长什么样：上传穿搭图后由视觉模型生成外观描述并注入聊天提示词；每天随机换装，按季节和生日/春节/中秋/圣诞等特殊日子自动切换；支持自拍、换装、图片上传与日期预览命令，还能在 MaiBot 首页打开本地上传页，不用在 QQ 里发指令。",
+  "description": "上传图片让模型知道自己穿什么；每天随机换一套；自己写特殊日子，当天就穿指定衣服。所有操作都在 MaiBot 首页的「她的衣橱」本地页面完成，不用在 QQ 里发指令。",
   "author": {
     "name": "Tyler",
     "url": "https://github.com/qipi128-blip"
@@ -23,13 +23,7 @@
     "min_version": "2.8.0",
     "max_version": "2.99.99"
   },
-  "dependencies": [
-    {
-      "type": "python_package",
-      "name": "lunardate",
-      "version_spec": ">=0.2.2"
-    }
-  ],
+  "dependencies": [],
   "plugin_type": "extension",
   "changelog": "CHANGELOG.md",
   "display": {
@@ -42,9 +36,7 @@
   },
   "capabilities": [
     "send.text",
-    "send.image",
     "llm.generate",
-    "message.get_by_id",
     "config.get"
   ],
   "i18n": {
