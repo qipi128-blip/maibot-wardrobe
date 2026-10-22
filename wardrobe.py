@@ -388,30 +388,37 @@ class WardrobeStore:
         self.wardrobe = Wardrobe()
         self.last_error = ""
         self._mtime_ns = -1
+        self._size = -1
         self._loaded = False
 
     def ensure_loaded(self, *, force: bool = False) -> Wardrobe:
         try:
             stat = self.path.stat()
             current_mtime = stat.st_mtime_ns
+            current_size = stat.st_size
         except FileNotFoundError:
             current_mtime = -1
+            current_size = -1
 
-        if not force and self._loaded and current_mtime == self._mtime_ns:
+        if not force and self._loaded and current_mtime == self._mtime_ns and current_size == self._size:
             return self.wardrobe
 
         if not self.path.exists():
             self._initialize_file()
             try:
-                current_mtime = self.path.stat().st_mtime_ns
+                stat = self.path.stat()
+                current_mtime = stat.st_mtime_ns
+                current_size = stat.st_size
             except FileNotFoundError:
                 current_mtime = -1
+                current_size = -1
 
         try:
             text = self.path.read_text(encoding="utf-8")
             self.wardrobe = Wardrobe.from_toml(text)
             self.last_error = ""
             self._mtime_ns = current_mtime
+            self._size = current_size
             self._loaded = True
             if self.logger is not None:
                 self.logger.info(
@@ -435,9 +442,12 @@ class WardrobeStore:
         self.wardrobe = target
         self._loaded = True
         try:
-            self._mtime_ns = self.path.stat().st_mtime_ns
+            stat = self.path.stat()
+            self._mtime_ns = stat.st_mtime_ns
+            self._size = stat.st_size
         except FileNotFoundError:
             self._mtime_ns = -1
+            self._size = -1
 
     def _initialize_file(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

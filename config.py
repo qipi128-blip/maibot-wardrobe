@@ -41,7 +41,7 @@ class PluginSectionConfig(PluginConfigBase):
         default="Asia/Shanghai",
         description="计算日期、季节和每日穿搭使用的时区",
     )
-    config_version: str = Field(default="1.0.0", description="配置版本")
+    config_version: str = Field(default="1.1.0", description="配置版本")
 
 
 class IdentityConfig(PluginConfigBase):
@@ -317,6 +317,36 @@ class DebugConfig(PluginConfigBase):
     )
 
 
+class WebUiConfig(PluginConfigBase):
+    """本地网页上传。"""
+
+    __ui_label__ = "网页上传"
+    __ui_icon__ = "globe"
+    __ui_order__ = 12
+
+    enabled: bool = Field(
+        default=True,
+        description="是否启动只监听 127.0.0.1 的本地上传页，并在 MaiBot 首页显示卡片",
+    )
+    port: int = Field(
+        default=0,
+        ge=0,
+        le=65535,
+        description="上传页端口；0 表示每次启动自动选择空闲端口，固定端口更方便收藏",
+    )
+    page_title: str = Field(default="她的衣橱", description="上传页标题")
+    show_home_card: bool = Field(
+        default=True,
+        description="是否在 MaiBot 首页显示「她的衣橱」卡片；关闭后仍可用固定端口访问",
+    )
+    home_card_order: int = Field(
+        default=1200,
+        ge=0,
+        le=99999,
+        description="首页卡片排序，越小越靠前",
+    )
+
+
 class WardrobeConfig(PluginConfigBase):
     """插件总配置。"""
 
@@ -332,3 +362,4 @@ class WardrobeConfig(PluginConfigBase):
     commands: CommandConfig = Field(default_factory=CommandConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
+    web_ui: WebUiConfig = Field(default_factory=WebUiConfig)

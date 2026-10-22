@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import base64
 import random
 import re
+import secrets
+import socket
 import time
 import uuid
 
@@ -40,6 +42,7 @@ from .prompt import (
 )
 from .state import DailyState
 from .wardrobe import Outfit, Selection, Wardrobe, WardrobeStore, safe_outfit_id, select_outfit
+from .webui import WardrobeWebServer
 
 _PROMPT_MARKER = "【你此刻的形象"
 _MAX_MESSAGE_CHARS = 1800
@@ -79,6 +82,10 @@ class WardrobePlugin(MaiBotPlugin):
         self._last_selfie_at: dict[str, float] = {}
         self._lunar_warned = False
         self._started = False
+        self._web_socket: socket.socket | None = None
+        self._web_server: WardrobeWebServer | None = None
+        self._web_port: int = 0
+        self._web_token: str = secrets.token_urlsafe(24)
 
     # ------------------------------------------------------------------ 生命周期
 
@@ -103,6 +110,7 @@ class WardrobePlugin(MaiBotPlugin):
                 self.ctx.logger.info("「她的衣橱」已加载，但插件未启用")
                 return
 
+            await self._start_web_server()
             today = self._today()
             selection = self._ensure_today(today)
             wardrobe = self._store.wardrobe
@@ -120,8 +128,12 @@ class WardrobePlugin(MaiBotPlugin):
             self.ctx.logger.exception("「她的衣橱」初始化失败: %s", exc)
 
     async def on_unload(self) -> None:
-        """保存状态。"""
+        """保存状态并关闭网页上传服务。"""
 
+        try:
+            await self._stop_web_server()
+        except Exception as exc:  # noqa: BLE001
+            self.ctx.logger.warning("衣橱网页上传服务关闭失败: %s", exc)
         try:
             if self._state is not None:
                 self._state.save()
@@ -151,9 +163,51 @@ class WardrobePlugin(MaiBotPlugin):
                 self._store.ensure_loaded(force=True)
             self._display_name = ""
             await self._resolve_display_name()
+            if not self.config.web_ui.enabled:
+                await self._stop_web_server()
+            elif self._web_server is None:
+                await self._start_web_server()
             self.ctx.logger.info("「她的衣橱」配置已热更新")
         except Exception as exc:  # noqa: BLE001
             self.ctx.logger.warning("「她的衣橱」配置热更新失败: %s", exc)
+
+    # ------------------------------------------------------------------ 组件
+
+    def get_components(self) -> list[dict[str, Any]]:
+        """在标准组件之外注册 MaiBot 首页的「她的衣橱」入口卡片。"""
+
+        components = super().get_components()
+        try:
+            if not self.config.plugin.enabled or not self.config.web_ui.enabled:
+                return components
+            if not self.config.web_ui.show_home_card:
+                return components
+            sock = self._ensure_web_socket()
+            if sock is None:
+                return components
+            components.append(
+                {
+                    "name": "wardrobe_web_upload",
+                    "type": "HOME_CARD",
+                    "metadata": {
+                        "title": self.config.web_ui.page_title or "她的衣橱",
+                        "description": "在浏览器里上传穿搭图、查看麦麦今天的穿搭，不用在 QQ 里发指令。",
+                        "content": "拖拽图片就能给她换装；也可以给现有衣服补图，或让视觉模型重新描述。",
+                        "link_url": self._web_url(),
+                        "link_label": "打开衣橱上传页",
+                        "icon": "shirt",
+                        "width": "medium",
+                        "order": int(self.config.web_ui.home_card_order),
+                        "show_title": True,
+                    },
+                }
+            )
+        except RuntimeError:
+            # 配置/上下文尚未注入时（例如纯声明检查）只返回静态组件。
+            return components
+        except Exception as exc:  # noqa: BLE001
+            self._get_logger().warning("衣橱首页卡片注册失败: %s", exc)
+        return components
 
     # ------------------------------------------------------------------ 提示词注入
 
@@ -468,13 +522,43 @@ class WardrobePlugin(MaiBotPlugin):
             )
             return True, "", 2
 
+        result = await self._save_outfit_images(outfit_id, "", caption, image_payloads)
+        if not result.get("ok"):
+            await self._say(stream_id, str(result.get("error") or result.get("message") or "上传失败"))
+            return True, "", 2
+        await self._say(stream_id, str(result.get("message") or "上传成功"))
+        return True, "", 2
+
+    async def _save_outfit_images(
+        self,
+        raw_outfit_id: str,
+        name: str,
+        caption: str,
+        image_payloads: Sequence[bytes],
+    ) -> dict[str, Any]:
+        """保存一批图片到指定衣服，供 QQ 命令和网页上传共用。"""
+
+        try:
+            outfit_id = safe_outfit_id(raw_outfit_id)
+        except ValueError as exc:
+            return {"ok": False, "error": f"衣服 ID 不合法：{exc}"}
+        if not image_payloads:
+            return {"ok": False, "error": "没有收到图片数据"}
+
         wardrobe = self._wardrobe()
-        display_name = re.split(r"[，。,.；;]", caption, maxsplit=1)[0].strip()[:24] if caption else raw_outfit_id
+        caption = str(caption or "").strip()
+        name = str(name or "").strip()
+        if name:
+            display_name = name[:24]
+        elif caption:
+            display_name = re.split(r"[，。,.；;]", caption, maxsplit=1)[0].strip()[:24]
+        else:
+            display_name = outfit_id
         outfit, created = wardrobe.ensure_outfit(outfit_id, name=display_name, description="")
         if caption and (created or self.config.upload.overwrite_description or not outfit.description):
             outfit.description = caption
-        if created and not caption:
-            outfit.name = raw_outfit_id
+        if created and not name and not caption:
+            outfit.name = outfit_id
 
         saved_count = 0
         last_relative = ""
@@ -490,8 +574,9 @@ class WardrobePlugin(MaiBotPlugin):
                     max_total_bytes=max_total_bytes,
                 )
             except ImageError as exc:
-                await self._say(stream_id, f"图片保存失败：{exc}")
-                return True, "", 2
+                if saved_count and self._store is not None:
+                    self._store.save(wardrobe)
+                return {"ok": False, "error": f"图片保存失败：{exc}", "outfit_id": outfit.id}
             if relative_path not in outfit.images:
                 outfit.images.append(relative_path)
                 saved_count += 1
@@ -506,6 +591,7 @@ class WardrobePlugin(MaiBotPlugin):
         if self._store is not None:
             self._store.save(wardrobe)
 
+        description = ""
         description_note = ""
         if self.config.upload.auto_describe and self.config.vision.enabled and last_relative:
             try:
@@ -516,10 +602,10 @@ class WardrobePlugin(MaiBotPlugin):
                         outfit.description = description
                     if self._store is not None:
                         self._store.save(wardrobe)
-                    description_note = f"\n视觉描述：{description}"
+                    description_note = f"视觉描述：{description}"
             except Exception as exc:  # noqa: BLE001
                 self.ctx.logger.warning("上传后生成视觉描述失败: %s", exc)
-                description_note = f"\n视觉描述生成失败：{exc}，可以稍后用 `/衣橱描述 {outfit.id}` 重试。"
+                description_note = f"视觉描述生成失败：{exc}，可以稍后用 `/衣橱描述 {outfit.id}` 重试。"
 
         lines = [
             f"已{'新建' if created else '更新'}「{outfit.display_name}」({outfit.id})，"
@@ -528,10 +614,19 @@ class WardrobePlugin(MaiBotPlugin):
         if removed:
             lines.append(f"已按上限清理 {len(removed)} 张旧图片。")
         if description_note:
-            lines.append(description_note.strip())
+            lines.append(description_note)
         lines.append("想让它只在特定季节出现，可以在 wardrobe.toml 里设置 seasons。")
-        await self._say(stream_id, "\n".join(lines))
-        return True, "", 2
+        return {
+            "ok": True,
+            "outfit_id": outfit.id,
+            "outfit_name": outfit.display_name,
+            "created": created,
+            "saved": saved_count,
+            "image_count": len(outfit.images),
+            "removed": len(removed),
+            "description": description,
+            "message": "\n".join(lines),
+        }
 
     @Command(
         name="wardrobe_describe",
@@ -963,6 +1058,60 @@ class WardrobePlugin(MaiBotPlugin):
         if len(text) > max_chars:
             text = text[:max_chars].rstrip() + "…"
         return text
+
+    # ------------------------------------------------------------------ 网页上传
+
+    def _ensure_web_socket(self) -> socket.socket | None:
+        """预留一个只监听 127.0.0.1 的端口，供首页卡片和上传页使用。"""
+
+        if not self.config.web_ui.enabled:
+            return None
+        if self._web_socket is not None:
+            return self._web_socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("127.0.0.1", int(self.config.web_ui.port)))
+            sock.listen(32)
+            sock.setblocking(False)
+            self._web_port = int(sock.getsockname()[1])
+        except OSError as exc:
+            sock.close()
+            self.ctx.logger.warning("衣橱网页上传端口不可用: %s", exc)
+            return None
+        self._web_socket = sock
+        return sock
+
+    def _web_url(self) -> str:
+        return f"http://127.0.0.1:{self._web_port}/?token={self._web_token}"
+
+    async def _start_web_server(self) -> None:
+        if not self.config.web_ui.enabled:
+            return
+        sock = self._ensure_web_socket()
+        if sock is None:
+            return
+        if self._web_server is None:
+            self._web_server = WardrobeWebServer(self)
+        if await self._web_server.start(sock):
+            self.ctx.logger.info(
+                "衣橱网页上传已启动：http://127.0.0.1:%s/（入口：MaiBot 首页「她的衣橱」卡片）",
+                self._web_port,
+            )
+        else:
+            self.ctx.logger.warning("衣橱网页上传服务未能启动，QQ 命令仍然可用")
+
+    async def _stop_web_server(self) -> None:
+        if self._web_server is not None:
+            await self._web_server.stop()
+            self._web_server = None
+        if self._web_socket is not None:
+            try:
+                self._web_socket.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._web_socket = None
+        self._web_port = 0
 
     # ------------------------------------------------------------------ 数据
 
