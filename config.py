@@ -33,7 +33,7 @@ class PluginSectionConfig(PluginConfigBase):
 
     enabled: bool = Field(default=True, description="是否启用「她的衣橱」")
     timezone: str = Field(default="Asia/Shanghai", description="计算日期使用的时区")
-    config_version: str = Field(default="2.0.0", description="配置版本")
+    config_version: str = Field(default="2.1.0", description="配置版本")
 
 
 class IdentityConfig(PluginConfigBase):

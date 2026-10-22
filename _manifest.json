@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "github.qipi128-blip.wardrobe",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "她的衣橱",
   "description": "上传图片让模型知道自己穿什么；每天随机换一套；自己写特殊日子，当天就穿指定衣服。所有操作都在 MaiBot 首页的「她的衣橱」本地页面完成，不用在 QQ 里发指令。",
   "author": {

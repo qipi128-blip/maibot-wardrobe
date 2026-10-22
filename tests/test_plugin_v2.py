@@ -62,6 +62,16 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("衣橱：8 套", text)
         self.assertNotIn("季节", text)
 
+    async def test_save_and_delete_outfit(self) -> None:
+        result = await self.plugin._save_outfit_images("gone_look", "要删的", "临时", [PNG_BYTES])
+        self.assertTrue(result["ok"])
+        outfit_dir = self.data_dir / "outfits" / "gone_look"
+        self.assertTrue(outfit_dir.is_dir())
+        deleted = self.plugin._delete_outfit("gone_look")
+        self.assertTrue(deleted["ok"])
+        self.assertIsNone(self.plugin._store.wardrobe.get_outfit("gone_look"))  # type: ignore[union-attr]
+        self.assertFalse(outfit_dir.exists())
+
     async def test_save_and_delete_image(self) -> None:
         result = await self.plugin._save_outfit_images("new_look", "新衣服", "一条测试裙子", [PNG_BYTES])
         self.assertTrue(result["ok"])

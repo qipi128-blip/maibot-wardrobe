@@ -90,6 +90,7 @@ class WebTests(unittest.IsolatedAsyncioTestCase):
         page = body.decode("utf-8")
         self.assertIn("特殊事件", page)
         self.assertIn("删除", page)
+        self.assertIn("删除这套", page)
         self.assertIn("换一套", page)
         self.assertNotIn("春装", page)
 
@@ -113,6 +114,16 @@ class WebTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 200, body[:300])
         self.assertTrue(json.loads(body)["ok"])
         self.assertFalse(image_path.exists())
+
+    async def test_delete_outfit(self) -> None:
+        query = "/api/upload?outfit_id=web_del&name=" + urllib.parse.quote("待删除")
+        status, _body, _headers = await self.request(query, method="POST", data=PNG_BYTES, content_type="image/png")
+        self.assertEqual(status, 200)
+        status, body, _headers = await self.request("/api/delete_outfit?outfit_id=web_del", method="POST")
+        self.assertEqual(status, 200, body[:300])
+        self.assertTrue(json.loads(body)["ok"])
+        status, body, _headers = await self.request("/api/state")
+        self.assertNotIn("web_del", {item["id"] for item in json.loads(body)["outfits"]})
 
     async def test_event_save_delete(self) -> None:
         query = (

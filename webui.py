@@ -99,6 +99,10 @@ class WardrobeWebServer:
                     self._first(params, "outfit_id"), int(self._first(params, "index", "0") or 0)
                 ))
                 return
+            if method == "POST" and path == "/api/delete_outfit":
+                result = self._plugin._delete_outfit(self._first(params, "outfit_id"))
+                await self._send_json(writer, HTTPStatus.OK if result.get("ok") else HTTPStatus.BAD_REQUEST, result)
+                return
             if method == "POST" and path == "/api/select":
                 await self._handle_select(writer, params)
                 return
@@ -575,6 +579,20 @@ function renderOutfits(){
     });
     actions.appendChild(wear);
     actions.appendChild(add);
+    const removeOutfit = document.createElement('button');
+    removeOutfit.className = 'danger';
+    removeOutfit.textContent = '删除这套';
+    removeOutfit.addEventListener('click', async function(){
+      if (!confirm('确定删除「' + item.name + '」这套衣服吗？它的图片也会一起删除，不能恢复。')) return;
+      removeOutfit.disabled = true;
+      try {
+        await apiFetch('/api/delete_outfit?outfit_id=' + encodeURIComponent(item.id), {method:'POST'});
+        await loadState();
+        setStatus('已删除「' + item.name + '」。', 'ok');
+      } catch (error) { setStatus('删除失败：' + error.message, 'bad'); }
+      finally { removeOutfit.disabled = false; }
+    });
+    actions.appendChild(removeOutfit);
     top.appendChild(actions);
     row.appendChild(top);
     if (item.image_count > 0) {

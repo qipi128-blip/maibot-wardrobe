@@ -88,6 +88,12 @@ class DailyState:
         self.save()
         return selection
 
+    def clear_today(self) -> None:
+        """清空当天穿搭（衣服被删除时使用）。"""
+
+        self.today = None
+        self.save()
+
     def recent_outfit_ids(self, day: date, days: int) -> set[str]:
         """返回最近 ``days`` 天穿过的衣服 ID（不含当天）。"""
 

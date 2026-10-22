@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import re
 import secrets
+import shutil
 import socket
 import time
 import uuid
@@ -437,6 +438,37 @@ class WardrobePlugin(MaiBotPlugin):
             self._store.save(wardrobe)
         return {"ok": True, "outfit_id": outfit.id, "image_count": len(outfit.images)}
 
+    def _delete_outfit(self, outfit_id: str) -> dict[str, Any]:
+        """删除整套衣服、它的图片目录，以及事件里对它的引用。"""
+
+        normalized = str(outfit_id or "").strip()
+        wardrobe = self._wardrobe()
+        outfit = wardrobe.get_outfit(normalized)
+        if outfit is None:
+            return {"ok": False, "error": "找不到这套衣服"}
+
+        wardrobe.remove_outfit(normalized)
+        for event in wardrobe.events:
+            event.outfits = [item for item in event.outfits if item != normalized]
+        if self._store is not None:
+            self._store.save(wardrobe)
+
+        root = (self._data_dir or Path(".")) / "outfits"
+        target = root / normalized
+        try:
+            resolved_root = root.resolve()
+            resolved_target = target.resolve()
+            if resolved_target != resolved_root and resolved_root in resolved_target.parents:
+                shutil.rmtree(resolved_target, ignore_errors=True)
+        except Exception as exc:  # noqa: BLE001
+            self.ctx.logger.warning("删除衣服图片目录失败: %s", exc)
+
+        if self._state is not None and self._state.today is not None and self._state.today.outfit_id == normalized:
+            self._state.clear_today()
+            self._ensure_today(self._today())
+
+        return {"ok": True, "outfit_id": normalized}
+
     def _save_event(
         self,
         event_id: str,
@@ -602,6 +634,8 @@ class WardrobePlugin(MaiBotPlugin):
         selection = self._state.ensure_today(day, lambda: self._pick(day))
         if selection is not None and self._wardrobe().get_outfit(selection.outfit_id) is None:
             selection = self._state.reroll(day, lambda: self._pick(day))
+            if selection is None:
+                self._state.clear_today()
         return selection
 
     def _outfit_of(self, selection: Selection | None) -> Outfit | None:
