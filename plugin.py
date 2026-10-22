@@ -462,6 +462,7 @@ class WardrobePlugin(MaiBotPlugin):
             "`/衣橱上传 <id> <名字>` 上传图片并新建/补充一套衣服（可带图、可回复图片）\n"
             "`/衣橱描述 <id>` 用视觉模型重新生成这套衣服的描述\n"
             "`/衣橱换装` 重新抽一套今天的衣服（管理员）\n"
+            "`/衣橱穿 <id>` 指定今天穿哪套（管理员）\n"
             "`/衣橱事件` 查看今天和未来的特殊日子\n"
             "`/衣橱预览 <YYYY-MM-DD>` 预览某天会穿什么（管理员）\n"
             "`/看看你` 或 `/自拍` 发送今天的照片\n\n"
@@ -615,6 +616,7 @@ class WardrobePlugin(MaiBotPlugin):
             lines.append(f"已按上限清理 {len(removed)} 张旧图片。")
         if description_note:
             lines.append(description_note)
+        lines.append("想让她今天穿这套，点衣橱里的「穿这套」。")
         lines.append("想让它只在特定季节出现，可以在 wardrobe.toml 里设置 seasons。")
         return {
             "ok": True,
@@ -697,6 +699,39 @@ class WardrobePlugin(MaiBotPlugin):
         await self._say(
             stream_id,
             f"换好了～今天穿「{outfit.display_name if outfit else selection.outfit_id}」"
+            f"（{season_label(selection.season)}）。",
+        )
+        return True, "", 2
+
+    @Command(
+        name="wardrobe_wear",
+        pattern=r"^\s*/衣橱(?:穿|wear)\b\s*(\S+)\s*$",
+        description="让麦麦今天穿指定衣服：/衣橱穿 <id>（管理员）",
+    )
+    @_safe_command
+    async def cmd_wear(self, **kwargs: Any) -> tuple[bool, str, int]:
+        """手动指定今天的穿搭。"""
+
+        if not await self._command_ready(kwargs):
+            return True, "", 2
+        stream_id = self._stream_id(kwargs)
+        if not self._is_admin(kwargs):
+            await self._say(stream_id, "只有管理员可以指定今天穿什么。")
+            return True, "", 2
+        text = str(kwargs.get("text", "") or "").strip()
+        match = re.match(r"^\s*/衣橱(?:穿|wear)\s+(\S+)\s*$", text, flags=re.IGNORECASE)
+        outfit_id = (match.group(1) if match else "").strip()
+        if not outfit_id:
+            await self._say(stream_id, "用法：`/衣橱穿 spring_breeze`")
+            return True, "", 2
+        selection = self._wear_today(outfit_id)
+        if selection is None:
+            await self._say(stream_id, f"找不到可穿的衣服：`{outfit_id}`")
+            return True, "", 2
+        outfit = self._outfit_of(selection)
+        await self._say(
+            stream_id,
+            f"好的，今天就穿「{outfit.display_name if outfit else selection.outfit_id}」"
             f"（{season_label(selection.season)}）。",
         )
         return True, "", 2
@@ -1208,6 +1243,29 @@ class WardrobePlugin(MaiBotPlugin):
         if self._state is None:
             return None
         return self._state.reroll(self._today(), lambda: self._pick(self._today()))
+
+    def _wear_today(self, outfit_id: str) -> Selection | None:
+        """手动把某套衣服设为今天的穿搭。"""
+
+        wardrobe = self._wardrobe()
+        outfit = wardrobe.get_outfit(str(outfit_id or "").strip())
+        if outfit is None or not outfit.enabled:
+            return None
+        today = self._today()
+        season_id = self._season_of(today)
+        events = active_events(wardrobe.events, today, season_id) if self.config.event.enabled else []
+        selection = Selection(
+            day=today.isoformat(),
+            outfit_id=outfit.id,
+            season=season_id,
+            source="manual",
+            event_ids=[event.id for event in events],
+            note="；".join(event.note for event in events if event.note),
+            picked_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+        )
+        if self._state is not None:
+            self._state.set_today(selection)
+        return selection
 
     def _preview_day(self, day: date) -> Selection | None:
         wardrobe = self._wardrobe()

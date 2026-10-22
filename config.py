@@ -41,7 +41,7 @@ class PluginSectionConfig(PluginConfigBase):
         default="Asia/Shanghai",
         description="计算日期、季节和每日穿搭使用的时区",
     )
-    config_version: str = Field(default="1.1.1", description="配置版本")
+    config_version: str = Field(default="1.2.0", description="配置版本")
 
 
 class IdentityConfig(PluginConfigBase):

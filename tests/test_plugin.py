@@ -42,6 +42,7 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
             "wardrobe_upload",
             "wardrobe_describe",
             "wardrobe_reroll",
+            "wardrobe_wear",
             "wardrobe_events",
             "wardrobe_preview",
             "wardrobe_selfie",
@@ -110,6 +111,20 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
         text = self.ctx.send.texts[-1][1]
         self.assertIn("生日", text)
         self.assertIn("生日礼服", text)
+
+    async def test_wear_command(self) -> None:
+        ok, _message, _intercept = await self.plugin.cmd_wear(
+            stream_id="stream-1",
+            user_id="10001",
+            is_local_operator=True,
+            text="/衣橱穿 spring_breeze",
+        )
+        self.assertTrue(ok)
+        selection = self.plugin._state.today  # type: ignore[union-attr]
+        assert selection is not None
+        self.assertEqual(selection.outfit_id, "spring_breeze")
+        self.assertEqual(selection.source, "manual")
+        self.assertIn("穿「春日微风」", self.ctx.send.texts[-1][1])
 
     async def test_upload_with_current_image(self) -> None:
         self.ctx.message.messages["m-upload"] = {
@@ -224,6 +239,7 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
             "/衣橱上传 spring_dress 春日白裙": "wardrobe_upload",
             "/衣橱描述 spring_dress": "wardrobe_describe",
             "/衣橱换装": "wardrobe_reroll",
+            "/衣橱穿 spring_breeze": "wardrobe_wear",
             "/衣橱事件": "wardrobe_events",
             "/衣橱预览 2026-10-28": "wardrobe_preview",
             "/看看你": "wardrobe_selfie",

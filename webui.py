@@ -103,6 +103,9 @@ class WardrobeWebServer:
             if method == "POST" and path == "/api/describe":
                 await self._handle_describe(writer, params)
                 return
+            if method == "POST" and path == "/api/select":
+                await self._handle_select(writer, params)
+                return
 
             await self._send_json(writer, HTTPStatus.NOT_FOUND, {"success": False, "error": "not found"})
         except Exception as exc:  # noqa: BLE001
@@ -242,6 +245,18 @@ class WardrobeWebServer:
         if self._plugin._store is not None:
             self._plugin._store.save(wardrobe)
         await self._send_json(writer, HTTPStatus.OK, {"success": True, "description": description})
+
+    async def _handle_select(self, writer: asyncio.StreamWriter, params: Mapping[str, list[str]]) -> None:
+        outfit_id = self._first(params, "outfit_id")
+        selection = self._plugin._wear_today(outfit_id)
+        if selection is None:
+            await self._send_json(writer, HTTPStatus.NOT_FOUND, {"success": False, "error": "找不到这套衣服"})
+            return
+        await self._send_json(
+            writer,
+            HTTPStatus.OK,
+            {"success": True, "outfit_id": selection.outfit_id, "season": selection.season},
+        )
 
     async def _serve_image(self, writer: asyncio.StreamWriter, params: Mapping[str, list[str]]) -> None:
         outfit_id = self._first(params, "outfit_id")
@@ -523,11 +538,27 @@ function renderOutfits(){
       + '<div><div><strong>' + esc(item.name) + '</strong>' + badge
       + '<span class="badge">' + esc(item.id) + '</span></div>'
       + '<div class="meta">' + esc(item.season) + ' · ' + item.image_count + ' 张图</div></div></div>'
-      + '<button class="ghost" data-id="' + esc(item.id) + '">补图</button>';
-    row.querySelector('button').addEventListener('click', function(){
+      + '<div style="display:flex;gap:6px;flex:none">'
+      + '<button class="ghost" data-action="wear">穿这套</button>'
+      + '<button class="ghost" data-action="add">补图</button></div>';
+    row.querySelector('[data-action="add"]').addEventListener('click', function(){
       document.getElementById('outfit').value = item.id;
       document.getElementById('outfit').dispatchEvent(new Event('change'));
       document.getElementById('drop').scrollIntoView({behavior:'smooth', block:'center'});
+    });
+    row.querySelector('[data-action="wear"]').addEventListener('click', async function(){
+      const button = this;
+      button.disabled = true;
+      setStatus('正在把「' + item.name + '」设为今天 …');
+      try {
+        await apiFetch('/api/select?outfit_id=' + encodeURIComponent(item.id), {method:'POST'});
+        await loadState();
+        setStatus('今天穿「' + item.name + '」啦。', 'ok');
+      } catch (error) {
+        setStatus('设置失败：' + error.message, 'bad');
+      } finally {
+        button.disabled = false;
+      }
     });
     list.appendChild(row);
   });

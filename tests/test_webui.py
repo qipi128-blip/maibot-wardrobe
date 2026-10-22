@@ -96,6 +96,20 @@ class WebUiTests(unittest.IsolatedAsyncioTestCase):
         status, _body, _headers = await self.request("/api/state", token="")
         self.assertEqual(status, 403)
 
+    async def test_select_outfit(self) -> None:
+        status, body, _headers = await self.request(
+            "/api/select?outfit_id=spring_breeze",
+            method="POST",
+        )
+        self.assertEqual(status, 200, body[:300])
+        payload = json.loads(body)
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["outfit_id"], "spring_breeze")
+
+        status, body, _headers = await self.request("/api/state")
+        state = json.loads(body)
+        self.assertEqual(state["today"]["outfit_id"], "spring_breeze")
+
     async def test_upload_and_serve_image(self) -> None:
         status, body, _headers = await self.request(
             "/api/upload?outfit_id=web_test&name="

@@ -80,6 +80,14 @@ class DailyState:
         self.save()
         return selection
 
+    def set_today(self, selection: Selection) -> Selection:
+        """手动指定当天的穿搭并写入历史。"""
+
+        self.today = selection
+        self._record(selection)
+        self.save()
+        return selection
+
     def recent_outfit_ids(self, day: date, days: int) -> set[str]:
         """返回最近 ``days`` 天穿过的衣服 ID（不含当天）。"""
 
