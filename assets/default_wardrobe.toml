@@ -1,0 +1,221 @@
+# 「她的衣橱」默认数据
+#
+# 直接改这个文件就能调整衣服和特殊日子；保存后下一次聊天自动生效，不需要重启。
+# 图片用 /衣橱上传 <id> <名字> 上传，会自动写回 images 字段。
+#
+# seasons 可选 spring / summer / autumn / winter；留空表示四季通用。
+# only_for_events = true 表示这套衣服只在特殊日子穿，不参与日常随机轮换。
+# 事件优先级 priority 越大越优先；同优先级的事件会合并候选衣服。
+
+[[outfits]]
+id = "daily_hoodie"
+name = "日常卫衣"
+description = "浅灰色连帽卫衣配黑色直筒裤，脚上是一双洗得有点旧的白色帆布鞋，头发随手扎成低马尾。"
+tags = ["日常", "休闲"]
+seasons = []
+weight = 1.2
+enabled = true
+only_for_events = false
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "spring_breeze"
+name = "春日微风"
+description = "米白色针织开衫配浅蓝色百褶裙，白色短袜和棕色乐福鞋，发间别着一枚小小的珍珠发夹。"
+tags = ["清新", "春日"]
+seasons = ["spring"]
+weight = 1.0
+enabled = true
+only_for_events = false
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "summer_soda"
+name = "夏日汽水"
+description = "白色短袖衬衫配浅色牛仔短裤，帆布托特包里塞着一瓶汽水，头发松松地挽起来，露出后颈。"
+tags = ["夏日", "清爽"]
+seasons = ["summer"]
+weight = 1.0
+enabled = true
+only_for_events = false
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "autumn_latte"
+name = "秋日拿铁"
+description = "驼色长风衣里面是奶白色高领针织衫，深棕色半身裙和短靴，围巾是焦糖色的。"
+tags = ["秋日", "温柔"]
+seasons = ["autumn"]
+weight = 1.0
+enabled = true
+only_for_events = false
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "winter_snow"
+name = "冬日初雪"
+description = "奶白色短款羽绒服配灰色针织长裙，红色围巾和毛线帽，鼻尖被冷风吹得有点红。"
+tags = ["冬日", "保暖"]
+seasons = ["winter"]
+weight = 1.0
+enabled = true
+only_for_events = false
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "rainy_day"
+name = "雨天散步"
+description = "卡其色防水短风衣配深色直筒裤，透明雨伞靠在肩边，鞋边溅了一点点水。"
+tags = ["雨天", "日常"]
+seasons = []
+weight = 0.8
+enabled = true
+only_for_events = false
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "birthday_dress"
+name = "生日礼服"
+description = "白色方领连衣裙，裙摆到小腿，腰间系一条细缎带，耳边是小小的珍珠耳钉，比平时认真许多。"
+tags = ["特别日子", "正式"]
+seasons = []
+weight = 1.0
+enabled = true
+only_for_events = true
+images = []
+vision_description = ""
+prompt_extra = ""
+
+[[outfits]]
+id = "new_year_hanfu"
+name = "新年汉服"
+description = "石榴红改良汉服，领口和袖口有浅金色滚边，外披一件米白斗篷，头发用红绳半束起来。"
+tags = ["新年", "节日"]
+seasons = ["winter"]
+weight = 1.0
+enabled = true
+only_for_events = true
+images = []
+vision_description = ""
+prompt_extra = ""
+
+# ---------------------------------------------------------------------------
+# 特殊日子
+# ---------------------------------------------------------------------------
+
+[[events]]
+id = "birthday"
+name = "生日"
+enabled = true
+priority = 200
+dates = ["10-28"]
+ranges = []
+lunar_dates = []
+weekdays = []
+months = []
+seasons = []
+outfits = ["birthday_dress"]
+note = "今天是你的生日，你特意换上了最喜欢的白色连衣裙，心情比平时更轻快一点。"
+exclusive = true
+
+[[events]]
+id = "spring_festival"
+name = "春节"
+enabled = true
+priority = 180
+dates = []
+ranges = []
+lunar_dates = ["01-01"]
+weekdays = []
+months = []
+seasons = []
+outfits = ["new_year_hanfu", "birthday_dress"]
+note = "今天是春节，你穿得比平时喜庆，见到熟人会主动说新年好。"
+exclusive = true
+
+[[events]]
+id = "mid_autumn"
+name = "中秋"
+enabled = true
+priority = 150
+dates = []
+ranges = []
+lunar_dates = ["08-15"]
+weekdays = []
+months = []
+seasons = []
+outfits = ["autumn_latte"]
+note = "今天是中秋，晚上可能会提到月亮和月饼。"
+exclusive = true
+
+[[events]]
+id = "christmas"
+name = "圣诞"
+enabled = true
+priority = 120
+dates = []
+ranges = ["12-24..12-26"]
+lunar_dates = []
+weekdays = []
+months = []
+seasons = []
+outfits = ["winter_snow"]
+note = "这几天是圣诞季，街上很热闹，你围着红围巾。"
+exclusive = true
+
+[[events]]
+id = "new_year"
+name = "元旦"
+enabled = true
+priority = 110
+dates = ["01-01"]
+ranges = []
+lunar_dates = []
+weekdays = []
+months = []
+seasons = []
+outfits = ["winter_snow", "daily_hoodie"]
+note = "今天是元旦，新的一年开始了。"
+exclusive = true
+
+[[events]]
+id = "valentine"
+name = "情人节"
+enabled = true
+priority = 100
+dates = ["02-14"]
+ranges = []
+lunar_dates = []
+weekdays = []
+months = []
+seasons = []
+outfits = ["birthday_dress"]
+note = "今天是情人节，你稍微打扮了一下。"
+exclusive = true
+
+[[events]]
+id = "rainy_season"
+name = "梅雨季"
+enabled = true
+priority = 30
+dates = []
+ranges = ["06-10..06-25"]
+lunar_dates = []
+weekdays = []
+months = []
+seasons = []
+outfits = ["rainy_day"]
+note = "最近是梅雨季，出门常带伞。"
+exclusive = true

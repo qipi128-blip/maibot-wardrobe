@@ -1,0 +1,55 @@
+{
+  "manifest_version": 2,
+  "id": "github.qipi128-blip.wardrobe",
+  "version": "1.0.0",
+  "name": "她的衣橱",
+  "description": "让麦麦知道自己长什么样：上传穿搭图后由视觉模型生成外观描述并注入聊天提示词；每天随机换装，按季节和生日/春节/中秋/圣诞等特殊日子自动切换；支持自拍、换装、图片上传与日期预览命令。",
+  "author": {
+    "name": "Tyler",
+    "url": "https://github.com/qipi128-blip"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://github.com/qipi128-blip/maibot-wardrobe",
+    "homepage": "https://github.com/qipi128-blip/maibot-wardrobe",
+    "documentation": "https://github.com/qipi128-blip/maibot-wardrobe/blob/main/README.md",
+    "issues": "https://github.com/qipi128-blip/maibot-wardrobe/issues"
+  },
+  "host_application": {
+    "min_version": "1.2.0",
+    "max_version": "1.99.99"
+  },
+  "sdk": {
+    "min_version": "2.8.0",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [
+    {
+      "type": "python_package",
+      "name": "lunardate",
+      "version_spec": ">=0.2.2"
+    }
+  ],
+  "plugin_type": "extension",
+  "display": {
+    "icon": {
+      "type": "local",
+      "value": "assets/icon.svg",
+      "fallback": "shirt",
+      "background": "#9a3412"
+    }
+  },
+  "capabilities": [
+    "send.text",
+    "send.image",
+    "llm.generate",
+    "message.get_by_id",
+    "config.get"
+  ],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": [
+      "zh-CN"
+    ]
+  }
+}
