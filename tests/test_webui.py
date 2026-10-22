@@ -84,6 +84,7 @@ class WebUiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["name"], "大肥鱼")
         self.assertEqual(payload["date"], "2026-10-22")
         self.assertEqual(len(payload["outfits"]), 8)
+        self.assertEqual(payload["max_file_mb"], 16.0)
 
         status, body, _headers = await self.request("/")
         self.assertEqual(status, 200)
@@ -126,6 +127,20 @@ class WebUiTests(unittest.IsolatedAsyncioTestCase):
         state = json.loads(body)
         ids = {item["id"] for item in state["outfits"]}
         self.assertIn("web_test", ids)
+
+    async def test_upload_too_large_returns_413(self) -> None:
+        config = self.plugin.get_plugin_config_data()
+        config["upload"]["max_file_mb"] = 0.5
+        self.plugin.set_plugin_config(config)
+        payload = PNG_BYTES + b"\x00" * (600 * 1024)
+        status, body, _headers = await self.request(
+            "/api/upload?outfit_id=too_big",
+            method="POST",
+            data=payload,
+            content_type="image/png",
+        )
+        self.assertEqual(status, 413)
+        self.assertIn("超过", json.loads(body)["error"])
 
     async def test_reject_non_image(self) -> None:
         status, body, _headers = await self.request(

@@ -41,7 +41,7 @@ class PluginSectionConfig(PluginConfigBase):
         default="Asia/Shanghai",
         description="计算日期、季节和每日穿搭使用的时区",
     )
-    config_version: str = Field(default="1.1.0", description="配置版本")
+    config_version: str = Field(default="1.1.1", description="配置版本")
 
 
 class IdentityConfig(PluginConfigBase):
@@ -213,10 +213,10 @@ class UploadConfig(PluginConfigBase):
         description="允许上传的 QQ 号列表；与 admin_user_ids 同时生效",
     )
     max_file_mb: float = Field(
-        default=8.0,
+        default=16.0,
         ge=0.5,
         le=50.0,
-        description="单张图片大小上限（MB）",
+        description="单张图片大小上限（MB）；手机截图常见 8-12MB，默认 16",
     )
     max_images_per_outfit: int = Field(
         default=8,
@@ -262,6 +262,18 @@ class VisionConfig(PluginConfigBase):
         ge=40,
         le=1000,
         description="保存的视觉描述最大字符数",
+    )
+    max_image_side: int = Field(
+        default=1280,
+        ge=0,
+        le=4096,
+        description="生成描述前把图片最长边缩到多少像素；0 表示不缩放（需要 Pillow，未安装时自动跳过）",
+    )
+    jpeg_quality: int = Field(
+        default=85,
+        ge=50,
+        le=95,
+        description="生成描述时重新编码 JPEG 的质量",
     )
 
 

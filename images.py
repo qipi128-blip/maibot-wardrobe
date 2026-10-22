@@ -7,6 +7,7 @@ from typing import Iterable
 
 import base64
 import hashlib
+import io
 
 
 class ImageError(ValueError):
@@ -107,6 +108,57 @@ def load_image_base64(data_dir: Path, relative_path: str) -> tuple[str, str] | N
     image_format = detect_image_format(data)
     if image_format is None:
         return None
+    return image_format, base64.b64encode(data).decode("ascii")
+
+
+def load_image_for_vision(
+    data_dir: Path,
+    relative_path: str,
+    *,
+    max_side: int = 1280,
+    jpeg_quality: int = 85,
+) -> tuple[str, str] | None:
+    """为视觉模型准备图片：有 Pillow 时缩放到 ``max_side`` 并转 JPEG。
+
+    大图直接 base64 传给视觉模型很容易超过 API 限制，也会拖慢请求；
+    这里只用于生成描述，不会修改用户上传的原图。没有 Pillow 时退回原图。
+    """
+
+    path = resolve_image_path(data_dir, relative_path)
+    if path is None or not path.is_file():
+        return None
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    image_format = detect_image_format(data)
+    if image_format is None:
+        return None
+
+    if max_side > 0:
+        try:
+            from PIL import Image
+
+            with Image.open(io.BytesIO(data)) as source:
+                source.seek(0)
+                image = source
+                if image.mode in {"RGBA", "LA", "P"}:
+                    rgba = image.convert("RGBA")
+                    background = Image.new("RGB", rgba.size, (255, 255, 255))
+                    background.paste(rgba, mask=rgba.split()[-1])
+                    image = background
+                else:
+                    image = image.convert("RGB")
+                width, height = image.size
+                if max(width, height) > max_side:
+                    resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS", 1)
+                    image.thumbnail((max_side, max_side), resampling)
+                buffer = io.BytesIO()
+                image.save(buffer, format="JPEG", quality=max(50, min(95, int(jpeg_quality))), optimize=True)
+                return "jpeg", base64.b64encode(buffer.getvalue()).decode("ascii")
+        except Exception:  # noqa: BLE001 - 没有 Pillow 或图片无法解码时使用原图
+            pass
+
     return image_format, base64.b64encode(data).decode("ascii")
 
 

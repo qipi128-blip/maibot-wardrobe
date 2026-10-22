@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "github.qipi128-blip.wardrobe",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "她的衣橱",
   "description": "让麦麦知道自己长什么样：上传穿搭图后由视觉模型生成外观描述并注入聊天提示词；每天随机换装，按季节和生日/春节/中秋/圣诞等特殊日子自动切换；支持自拍、换装、图片上传与日期预览命令，还能在 MaiBot 首页打开本地上传页，不用在 QQ 里发指令。",
   "author": {

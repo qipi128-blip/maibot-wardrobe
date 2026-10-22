@@ -122,7 +122,7 @@
 | --- | --- | --- |
 | `enabled` | `true` | 总开关 |
 | `timezone` | `Asia/Shanghai` | 日期/季节计算时区 |
-| `config_version` | `1.1.0` | 不要手改 |
+| `config_version` | `1.1.1` | 不要手改 |
 
 ### `[identity]`
 
@@ -188,7 +188,7 @@
 | `enabled` | `true` | 是否允许上传 |
 | `allow_all` | `false` | 是否允许所有人上传 |
 | `allowed_user_ids` | `[]` | 允许上传的 QQ 号 |
-| `max_file_mb` | `8` | 单图上限 |
+| `max_file_mb` | `16` | 单图上限（手机截图常见 8-12MB） |
 | `max_images_per_outfit` | `8` | 每套保留张数 |
 | `max_total_mb` | `512` | 图片目录总上限 |
 | `auto_describe` | `true` | 上传后自动视觉描述 |
@@ -204,6 +204,8 @@
 | `task_name` | `vlm` | 对应 `model_config.toml` 的 `[model_task_config.vlm]` |
 | `prompt` | 内置 | 视觉描述提示词 |
 | `description_max_chars` | `200` | 保存长度 |
+| `max_image_side` | `1280` | 生成描述前把图片最长边缩到多少像素；0 = 不缩放；需要 Pillow，没有时自动用原图 |
+| `jpeg_quality` | `85` | 缩放后 JPEG 质量 |
 
 ### `[commands]`
 
@@ -367,6 +369,12 @@ note = "这周在准备考试，可能回消息慢一点。"
 2. 确认 `[injection].enabled = true`，且 `planner`/`replyer` 至少一个为 `true`。
 3. 当前 MaiBot 需要支持 `maisaka.planner.before_request` / `maisaka.replyer.before_model_request` 两个 Hook（1.2.x 已支持）。如果日志里没有“衣橱提示词注入失败”，一般就是生效了。
 4. 模型可能选择不复述设定；问它“你今天穿的什么”测试。
+
+**网页上传提示 `Failed to fetch`？**
+
+- 1.1.1 起会先读完请求体再返回可读的大小提示；如果仍出现，先看图片是不是超过 `[upload].max_file_mb`。
+- 也可能是 MaiBot 插件运行时刚好重启，旧页面端口失效。回到 MaiBot 首页重新点一次「她的衣橱」卡片。
+- 上传页只监听本机 `127.0.0.1`；从另一台设备打开 Dashboard 时，卡片里的地址指向的是那台设备。
 
 **上传后没有自动描述？**
 

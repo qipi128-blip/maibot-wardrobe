@@ -33,7 +33,7 @@ from .calendar_rules import (
     upcoming_events,
 )
 from .config import WardrobeConfig
-from .images import ImageError, load_image_base64, prune_outfit_images, save_image
+from .images import ImageError, load_image_base64, load_image_for_vision, prune_outfit_images, save_image
 from .prompt import (
     build_identity_prompt,
     build_selfie_caption,
@@ -1018,7 +1018,12 @@ class WardrobePlugin(MaiBotPlugin):
 
         if not self.config.vision.enabled:
             raise RuntimeError("视觉描述功能已关闭")
-        loaded = load_image_base64(self._data_dir or Path("."), relative_path)
+        loaded = load_image_for_vision(
+            self._data_dir or Path("."),
+            relative_path,
+            max_side=int(self.config.vision.max_image_side),
+            jpeg_quality=int(self.config.vision.jpeg_quality),
+        )
         if loaded is None:
             raise RuntimeError("图片文件读取失败")
         image_format, image_base64 = loaded

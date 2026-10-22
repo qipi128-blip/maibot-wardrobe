@@ -19,6 +19,7 @@ import secrets
 from .images import detect_image_format, load_image_base64, mime_type_for_format
 
 _MAX_HEADER_BYTES = 32 * 1024
+_MAX_UPLOAD_HARD_BYTES = 64 * 1024 * 1024
 
 
 class WardrobeWebServer:
@@ -173,17 +174,29 @@ class WardrobeWebServer:
         if content_length <= 0:
             await self._send_json(writer, HTTPStatus.BAD_REQUEST, {"success": False, "error": "没有收到图片数据"})
             return
-        if content_length > max_bytes + 1024:
+        if content_length > _MAX_UPLOAD_HARD_BYTES:
             await self._send_json(
                 writer,
                 HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
-                {"success": False, "error": f"图片超过 {self._plugin.config.upload.max_file_mb:g} MB 限制"},
+                {"success": False, "error": "图片太大，单张不能超过 64 MB"},
             )
             return
+        # 先完整读取请求体再判断大小，避免服务端提前关闭连接导致浏览器只看到
+        # “Failed to fetch”，而不是可读的 413 提示。
         try:
-            body = await asyncio.wait_for(reader.readexactly(content_length), timeout=60)
+            body = await asyncio.wait_for(reader.readexactly(content_length), timeout=120)
         except (asyncio.TimeoutError, asyncio.IncompleteReadError):
             await self._send_json(writer, HTTPStatus.BAD_REQUEST, {"success": False, "error": "图片读取超时"})
+            return
+        if len(body) > max_bytes:
+            await self._send_json(
+                writer,
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                {
+                    "success": False,
+                    "error": f"图片有 {len(body) / 1024 / 1024:.1f} MB，超过 {self._plugin.config.upload.max_file_mb:g} MB 限制",
+                },
+            )
             return
         if detect_image_format(body) is None:
             await self._send_json(
@@ -295,6 +308,7 @@ class WardrobeWebServer:
             "today": today_payload,
             "outfits": outfits,
             "upload_enabled": bool(plugin.config.upload.enabled),
+            "max_file_mb": float(plugin.config.upload.max_file_mb),
             "vision_enabled": bool(plugin.config.vision.enabled),
         }
 
@@ -381,6 +395,7 @@ button.ghost{background:#fff;color:var(--accent);border:1px solid var(--line);pa
 .item{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px dashed var(--line);padding:8px 0}
 .item:last-child{border-bottom:0}
 .item .meta{color:var(--muted);font-size:13px}
+.mini{width:44px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#f3ece2;flex:none}
 .badge{background:#f3ece2;color:var(--muted);border-radius:999px;padding:1px 8px;font-size:12px;margin-left:6px}
 .hidden{display:none}
 .foot{text-align:center;color:var(--muted);font-size:12px;padding:10px 0 30px}
@@ -447,7 +462,12 @@ function setStatus(text, kind){
   node.textContent = text || '';
 }
 async function apiFetch(path, options){
-  const response = await fetch(API(path), options || {});
+  let response;
+  try {
+    response = await fetch(API(path), options || {});
+  } catch (err) {
+    throw new Error('连接已断开：插件可能刚刚重载或页面已过期。请回到 MaiBot 首页重新打开「她的衣橱」卡片。');
+  }
   let payload = null;
   try { payload = await response.json(); } catch (err) { payload = null; }
   if (!response.ok) {
@@ -495,9 +515,14 @@ function renderOutfits(){
     const row = document.createElement('div');
     row.className = 'item';
     const badge = item.only_for_events ? '<span class="badge">仅事件</span>' : '';
-    row.innerHTML = '<div><div><strong>' + esc(item.name) + '</strong>' + badge
+    const thumb = item.image_count
+      ? '<img class="mini" src="' + API('/image?outfit_id=' + encodeURIComponent(item.id) + '&index=0') + '" alt="">'
+      : '';
+    row.innerHTML = '<div style="display:flex;gap:10px;align-items:center;min-width:0">'
+      + thumb
+      + '<div><div><strong>' + esc(item.name) + '</strong>' + badge
       + '<span class="badge">' + esc(item.id) + '</span></div>'
-      + '<div class="meta">' + esc(item.season) + ' · ' + item.image_count + ' 张图</div></div>'
+      + '<div class="meta">' + esc(item.season) + ' · ' + item.image_count + ' 张图</div></div></div>'
       + '<button class="ghost" data-id="' + esc(item.id) + '">补图</button>';
     row.querySelector('button').addEventListener('click', function(){
       document.getElementById('outfit').value = item.id;
@@ -557,6 +582,13 @@ document.getElementById('upload').addEventListener('click', async function(){
   const caption = document.getElementById('caption').value.trim();
   if (!outfitId) { setStatus('请先填写新衣服的 ID。', 'bad'); return; }
   if (!files.length) { setStatus('请先选择图片。', 'bad'); return; }
+  const maxMb = Number(state && state.max_file_mb) || 16;
+  const tooBig = files.find(function(file){ return file.size > maxMb * 1024 * 1024; });
+  if (tooBig) {
+    setStatus('「' + tooBig.name + '」有 ' + (tooBig.size / 1024 / 1024).toFixed(1)
+      + ' MB，超过 ' + maxMb + ' MB 上限。请先压缩图片，或到 config.toml 的 [upload].max_file_mb 调大。', 'bad');
+    return;
+  }
   button.disabled = true;
   let success = 0;
   try {
